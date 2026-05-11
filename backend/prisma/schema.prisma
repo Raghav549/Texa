@@ -1,6 +1,11 @@
-generator client { provider = "prisma-client-js" }
-datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+generator client {
+  provider = "prisma-client-js"
+}
 
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
 enum Role { USER, ADMIN, SUPERADMIN }
 enum Level { BRONZE, SILVER, GOLD, PLATINUM, DIAMOND }
 enum MsgStatus { SENT, DELIVERED, SEEN }
@@ -33,7 +38,9 @@ model User {
   giftsSent     Gift[]    @relation("GiftSender")
   giftsReceived Gift[]    @relation("GiftReceiver")
   reports       Report[]
-  @@index([username]) @@index([email]) @@index([level])
+  @@index([username])
+@@index([email])
+@@index([level])
 }
 
 model Story {
@@ -44,7 +51,7 @@ model Story {
   caption   String   @default("")
   musicTrack String?
   stickers  Json     @default("{}")
-  expiresAt DateTime @default(now() + interval 24 hours)
+  expiresAt DateTime @default(now())
   viewers   String[]
   reactions Json     @default("{}")
   createdAt DateTime @default(now())
@@ -63,7 +70,7 @@ model Reel {
   comments     Comment[]
   views        Int      @default(0)
   createdAt    DateTime @default(now())
-  @@index([createdAt(sort: Desc)])
+  @@index([createdAt])
 }
 
 model Comment {
@@ -135,7 +142,8 @@ model Message {
   mediaUrl   String?
   status     MsgStatus @default(SENT)
   createdAt  DateTime @default(now())
-  @@index([senderId, receiverId]) @@index([createdAt(sort: Desc)])
+  @@index([senderId, receiverId])
+@@index([createdAt])
 }
 
 model Gift {
