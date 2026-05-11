@@ -6,10 +6,32 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
-enum Role { USER, ADMIN, SUPERADMIN }
-enum Level { BRONZE, SILVER, GOLD, PLATINUM, DIAMOND }
-enum MsgStatus { SENT, DELIVERED, SEEN }
-enum ReportType { CONTENT, USER, ROOM }
+
+enum Role {
+  USER
+  ADMIN
+  SUPERADMIN
+}
+
+enum Level {
+  BRONZE
+  SILVER
+  GOLD
+  PLATINUM
+  DIAMOND
+}
+
+enum MsgStatus {
+  SENT
+  DELIVERED
+  SEEN
+}
+
+enum ReportType {
+  CONTENT
+  USER
+  ROOM
+}
 
 model User {
   id            String    @id @default(cuid())
