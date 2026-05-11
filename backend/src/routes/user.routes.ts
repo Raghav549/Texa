@@ -1,0 +1,10 @@
+import { Router } from 'express';
+import { getProfile, searchUsers, follow, getPrestige } from '../controllers/user.controller';
+import { auth } from '../middleware/auth';
+const r = Router();
+r.use(auth);
+r.get('/search', searchUsers);
+r.get('/:id', getProfile);
+r.post('/follow/:targetId', follow);
+r.get('/prestige', getPrestige);
+export default r;
