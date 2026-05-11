@@ -1,0 +1,11 @@
+import { Router } from 'express';
+import { createStory, getStories, viewStory, reactStory } from '../controllers/story.controller';
+import { auth } from '../middleware/auth';
+import { upload } from '../middleware/upload';
+const r = Router();
+r.use(auth);
+r.post('/', upload.single('media'), createStory);
+r.get('/', getStories);
+r.post('/:id/view', viewStory);
+r.post('/:id/react', reactStory);
+export default r;
