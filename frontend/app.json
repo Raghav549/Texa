@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Texa",
-    "slug": "texa-universe",
+    "slug": "texa",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
