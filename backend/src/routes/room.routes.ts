@@ -1,0 +1,10 @@
+import { Router } from 'express';
+import { createRoom, getActiveRooms, hostControl } from '../controllers/room.controller';
+import { auth } from '../middleware/auth';
+import { upload } from '../middleware/upload';
+const r = Router();
+r.use(auth);
+r.post('/', upload.single('cover'), createRoom);
+r.get('/', getActiveRooms);
+r.post('/:id/control', hostControl);
+export default r;
