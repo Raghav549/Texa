@@ -175,3 +175,25 @@ model Announcement {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 }
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  type      String   // "broadcast", "trade_win", "gift", "dm", "level_up", "admin"
+  data      Json?    @default("{}")
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  @@index([userId, isRead])
+}
+
+model PushToken {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  token     String   @unique
+  platform  String   // "android", "ios", "web"
+  isActive  Boolean  @default(true)
+  lastUsed  DateTime @default(now())
+}
