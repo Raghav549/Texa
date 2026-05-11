@@ -1,0 +1,14 @@
+import { Router } from 'express';
+import { listUsers, manageUser, resetPassword, manageCoins, deleteContent, manageReports, setAnnouncement, getAnalytics } from '../controllers/admin.controller';
+import { auth, adminOnly } from '../middleware/auth';
+const r = Router();
+r.use(auth, adminOnly);
+r.get('/users', listUsers);
+r.post('/users/manage', manageUser);
+r.post('/users/reset-pass', resetPassword);
+r.post('/users/coins', manageCoins);
+r.post('/content/delete', deleteContent);
+r.get('/reports', manageReports);
+r.post('/announcement', setAnnouncement);
+r.get('/analytics', getAnalytics);
+export default r;
