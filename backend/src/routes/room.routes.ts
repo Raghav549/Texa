@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createRoom, getActiveRooms, hostControl } from '../controllers/room.controller';
+import { createRoom, getActiveRooms, hostControl } from '../controllers/voice.controller';
 import { auth } from '../middleware/auth';
 import { upload } from '../middleware/upload';
 const r = Router();
