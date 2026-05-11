@@ -1,0 +1,10 @@
+import { Router } from 'express';
+import { registerPushToken, getNotifications, markAllRead, adminSendNotification } from '../controllers/notification.controller';
+import { auth, adminOnly } from '../middleware/auth';
+const r = Router();
+r.use(auth);
+r.post('/register', registerPushToken);
+r.get('/', getNotifications);
+r.post('/read', markAllRead);
+r.post('/admin/send', adminOnly, adminSendNotification);
+export default r;
