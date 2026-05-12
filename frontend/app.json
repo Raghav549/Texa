@@ -1,0 +1,268 @@
+{
+  "expo": {
+    "name": "Texa",
+    "slug": "texa-universe",
+    "scheme": "texa",
+    "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "owner": "texa",
+    "newArchEnabled": true,
+    "jsEngine": "hermes",
+    "experiments": {
+      "typedRoutes": true,
+      "tsconfigPaths": true
+    },
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
+    "assetBundlePatterns": [
+      "assets/**/*"
+    ],
+    "updates": {
+      "enabled": true,
+      "fallbackToCacheTimeout": 0,
+      "checkAutomatically": "ON_LOAD",
+      "url": "https://u.expo.dev/YOUR_EAS_PROJECT_ID"
+    },
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#00F5D4",
+      "iosDisplayInForeground": true,
+      "androidMode": "default",
+      "androidCollapsedTitle": "Texa"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.texa.universe",
+      "buildNumber": "1",
+      "usesAppleSignIn": false,
+      "associatedDomains": [
+        "applinks:texa.app",
+        "applinks:www.texa.app"
+      ],
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Texa needs camera access to create reels, stories, profile photos, business media, and live room content.",
+        "NSMicrophoneUsageDescription": "Texa needs microphone access for voice rooms, voice messages, reels, stories, and live audio features.",
+        "NSPhotoLibraryUsageDescription": "Texa needs photo library access to upload reels, stories, profile photos, product images, and business media.",
+        "NSPhotoLibraryAddUsageDescription": "Texa needs permission to save edited media, QR codes, receipts, and shared content to your photo library.",
+        "NSLocationWhenInUseUsageDescription": "Texa uses location to show nearby rooms, nearby creators, nearby businesses, and relevant discovery suggestions.",
+        "NSUserTrackingUsageDescription": "Texa may use limited analytics to improve recommendations, safety, performance, and creator insights.",
+        "UIBackgroundModes": [
+          "remote-notification",
+          "audio"
+        ],
+        "LSApplicationQueriesSchemes": [
+          "texa",
+          "mailto",
+          "tel",
+          "sms",
+          "whatsapp",
+          "instagram",
+          "fb",
+          "twitter",
+          "x",
+          "youtube",
+          "upi",
+          "paytmmp",
+          "phonepe",
+          "gpay",
+          "tez"
+        ]
+      }
+    },
+    "android": {
+      "package": "com.texa.universe",
+      "versionCode": 1,
+      "allowBackup": false,
+      "softwareKeyboardLayoutMode": "resize",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "texa.app"
+            },
+            {
+              "scheme": "https",
+              "host": "www.texa.app"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        },
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "texa"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.VIBRATE",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+        "android.permission.WAKE_LOCK"
+      ],
+      "blockedPermissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png",
+      "name": "Texa",
+      "shortName": "Texa",
+      "themeColor": "#00F5D4",
+      "backgroundColor": "#FFFFFF",
+      "display": "standalone",
+      "startUrl": "/"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-av",
+      "expo-secure-store",
+      "expo-localization",
+      "expo-web-browser",
+      "expo-system-ui",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#FFFFFF"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Texa needs photo access to upload reels, stories, profile photos, product images, and business media.",
+          "cameraPermission": "Texa needs camera access to create reels, stories, profile photos, and live room content.",
+          "microphonePermission": "Texa needs microphone access for reels, stories, voice messages, and voice rooms."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Texa needs camera access to create reels, stories, profile photos, and live room content.",
+          "microphonePermission": "Texa needs microphone access for reels, stories, voice messages, and voice rooms.",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Texa needs media library access to select reels, stories, profile photos, product images, and business media.",
+          "savePhotosPermission": "Texa needs permission to save edited media, QR codes, receipts, and shared content."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Texa uses location to show nearby rooms, nearby creators, nearby businesses, and relevant discovery suggestions.",
+          "locationWhenInUsePermission": "Texa uses location to show nearby rooms, nearby creators, nearby businesses, and relevant discovery suggestions."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#00F5D4",
+          "sounds": [
+            "./assets/sounds/notification.wav"
+          ],
+          "mode": "production"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "minSdkVersion": 24,
+            "enableProguardInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "usesCleartextTraffic": false,
+            "packagingOptions": {
+              "pickFirst": [
+                "**/libc++_shared.so"
+              ]
+            }
+          },
+          "ios": {
+            "deploymentTarget": "15.1",
+            "useFrameworks": "static"
+          }
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "YOUR_EAS_PROJECT_ID"
+      },
+      "appName": "Texa",
+      "appSlug": "texa-universe",
+      "environment": "production",
+      "apiUrl": "https://api.texa.app",
+      "wsUrl": "wss://api.texa.app",
+      "cdnUrl": "https://cdn.texa.app",
+      "webUrl": "https://texa.app",
+      "supportEmail": "support@texa.app",
+      "privacyUrl": "https://texa.app/privacy",
+      "termsUrl": "https://texa.app/terms",
+      "enableAnalytics": true,
+      "enableCrashReporting": true,
+      "enableOTAUpdates": true,
+      "enableRealtime": true,
+      "enableCreatorEconomy": true,
+      "enableCommerce": true,
+      "enableNearbyDiscovery": true,
+      "enableAIModeration": true,
+      "maxUploadSizeMB": 500,
+      "defaultLocale": "en",
+      "supportedLocales": [
+        "en",
+        "hi"
+      ]
+    }
+  }
+}
