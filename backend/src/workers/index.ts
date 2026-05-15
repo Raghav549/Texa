@@ -1,4 +1,4 @@
-import { Queue, Worker, QueueEvents, JobsOptions, WorkerOptions, QueueOptions, Job } from "bullmq";
+import { Queue, Worker, QueueEvents, JobsOptions, WorkerOptions, QueueOptions, Job, Processor } from "bullmq";
 import crypto from "crypto";
 import { redis } from "../config/redis";
 import { processMediaWorker } from "./media.worker";
@@ -34,23 +34,7 @@ export interface ModerationJobData {
 export interface AnalyticsJobData {
   userId?: string;
   anonymousId?: string;
-  type:
-    | "view"
-    | "like"
-    | "comment"
-    | "share"
-    | "save"
-    | "follow"
-    | "purchase"
-    | "add_to_cart"
-    | "checkout_start"
-    | "ad_impression"
-    | "ad_click"
-    | "ad_conversion"
-    | "story_view"
-    | "reel_watch"
-    | "search"
-    | "custom";
+  type: "view" | "like" | "comment" | "share" | "save" | "follow" | "purchase" | "add_to_cart" | "checkout_start" | "ad_impression" | "ad_click" | "ad_conversion" | "story_view" | "reel_watch" | "search" | "custom";
   targetType?: string;
   targetId?: string;
   sessionId?: string;
@@ -59,44 +43,23 @@ export interface AnalyticsJobData {
 }
 
 type QueueBundle = {
-  queue: Queue<any, any, any>;
+  queue: Queue<any, any, string>;
   events: QueueEvents;
-  worker: Worker<any, any, any>;
+  worker: Worker<any, any, string>;
 };
 
 const QUEUE_NAMES: QueueName[] = ["media_processing", "ai_moderation", "analytics_tracking"];
-
-const connection = redis.duplicate({
-  maxRetriesPerRequest: null,
-  enableReadyCheck: false
-});
-
-const queueConnection = redis.duplicate({
-  maxRetriesPerRequest: null,
-  enableReadyCheck: false
-});
-
-const eventConnection = redis.duplicate({
-  maxRetriesPerRequest: null,
-  enableReadyCheck: false
-});
+const connection = redis.duplicate({ maxRetriesPerRequest: null, enableReadyCheck: false });
+const queueConnection = redis.duplicate({ maxRetriesPerRequest: null, enableReadyCheck: false });
+const eventConnection = redis.duplicate({ maxRetriesPerRequest: null, enableReadyCheck: false });
 
 const defaultQueueOptions: QueueOptions = {
   connection: queueConnection,
   defaultJobOptions: {
     attempts: 3,
-    backoff: {
-      type: "exponential",
-      delay: 2000
-    },
-    removeOnComplete: {
-      age: 60 * 60 * 24,
-      count: 500
-    },
-    removeOnFail: {
-      age: 60 * 60 * 24 * 7,
-      count: 1000
-    }
+    backoff: { type: "exponential", delay: 2000 },
+    removeOnComplete: { age: 60 * 60 * 24, count: 500 },
+    removeOnFail: { age: 60 * 60 * 24 * 7, count: 1000 }
   }
 };
 
@@ -114,23 +77,16 @@ const sanitizeQueueNumber = (value: unknown, fallback: number, min: number, max:
   return Math.max(min, Math.min(max, Math.floor(parsed)));
 };
 
-const hashPayload = (payload: unknown) => {
-  return crypto.createHash("sha256").update(JSON.stringify(payload || {})).digest("hex").slice(0, 24);
-};
+const hashPayload = (payload: unknown) => crypto.createHash("sha256").update(JSON.stringify(payload || {})).digest("hex").slice(0, 24);
+const compactObject = <T extends Record<string, any>>(value: T): T => Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as T;
 
-const compactObject = <T extends Record<string, any>>(value: T): T => {
-  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as T;
-};
-
-const mergeJobOptions = (base: JobsOptions, override?: JobsOptions): JobsOptions => {
-  return compactObject({
-    ...base,
-    ...override,
-    backoff: override?.backoff ?? base.backoff,
-    removeOnComplete: override?.removeOnComplete ?? base.removeOnComplete,
-    removeOnFail: override?.removeOnFail ?? base.removeOnFail
-  });
-};
+const mergeJobOptions = (base: JobsOptions, override?: JobsOptions): JobsOptions => compactObject({
+  ...base,
+  ...override,
+  backoff: override?.backoff ?? base.backoff,
+  removeOnComplete: override?.removeOnComplete ?? base.removeOnComplete,
+  removeOnFail: override?.removeOnFail ?? base.removeOnFail
+});
 
 const createJobId = (prefix: string, data: Record<string, any>, unique = false) => {
   if (unique) return `${prefix}:${Date.now()}:${crypto.randomBytes(8).toString("hex")}`;
@@ -156,414 +112,93 @@ const ensureAnalyticsJob = (jobData: AnalyticsJobData, label: string) => {
   if (!jobData?.type) throw new Error(`${label} job requires type`);
 };
 
-export const mediaQueue = new Queue<MediaProcessingJobData, any, MediaJobName>("media_processing", {
-  ...defaultQueueOptions,
-  defaultJobOptions: {
-    ...defaultQueueOptions.defaultJobOptions,
-    attempts: 4,
-    removeOnComplete: {
-      age: 60 * 60 * 24,
-      count: 300
-    },
-    removeOnFail: {
-      age: 60 * 60 * 24 * 7,
-      count: 1000
-    }
-  }
-});
-
-export const moderationQueue = new Queue<ModerationJobData, any, ModerationJobName>("ai_moderation", {
-  ...defaultQueueOptions,
-  defaultJobOptions: {
-    ...defaultQueueOptions.defaultJobOptions,
-    attempts: 3,
-    removeOnComplete: {
-      age: 60 * 60 * 24,
-      count: 300
-    },
-    removeOnFail: {
-      age: 60 * 60 * 24 * 7,
-      count: 1000
-    }
-  }
-});
-
-export const analyticsQueue = new Queue<AnalyticsJobData, any, AnalyticsJobName>("analytics_tracking", {
-  ...defaultQueueOptions,
-  defaultJobOptions: {
-    ...defaultQueueOptions.defaultJobOptions,
-    attempts: 5,
-    removeOnComplete: {
-      age: 60 * 60 * 12,
-      count: 2000
-    },
-    removeOnFail: {
-      age: 60 * 60 * 24 * 3,
-      count: 2000
-    }
-  }
-});
+export const mediaQueue = new Queue<MediaProcessingJobData, any, MediaJobName>("media_processing", { ...defaultQueueOptions, defaultJobOptions: { ...defaultQueueOptions.defaultJobOptions, attempts: 4, removeOnComplete: { age: 60 * 60 * 24, count: 300 }, removeOnFail: { age: 60 * 60 * 24 * 7, count: 1000 } } });
+export const moderationQueue = new Queue<ModerationJobData, any, ModerationJobName>("ai_moderation", { ...defaultQueueOptions, defaultJobOptions: { ...defaultQueueOptions.defaultJobOptions, attempts: 3, removeOnComplete: { age: 60 * 60 * 24, count: 300 }, removeOnFail: { age: 60 * 60 * 24 * 7, count: 1000 } } });
+export const analyticsQueue = new Queue<AnalyticsJobData, any, AnalyticsJobName>("analytics_tracking", { ...defaultQueueOptions, defaultJobOptions: { ...defaultQueueOptions.defaultJobOptions, attempts: 5, removeOnComplete: { age: 60 * 60 * 12, count: 2000 }, removeOnFail: { age: 60 * 60 * 24 * 3, count: 2000 } } });
 
 export const mediaQueueEvents = new QueueEvents("media_processing", { connection: eventConnection.duplicate() });
 export const moderationQueueEvents = new QueueEvents("ai_moderation", { connection: eventConnection.duplicate() });
 export const analyticsQueueEvents = new QueueEvents("analytics_tracking", { connection: eventConnection.duplicate() });
 
-export const mediaWorker = new Worker<MediaProcessingJobData, any, MediaJobName>(
-  "media_processing",
-  async (job: Job<MediaProcessingJobData, any, MediaJobName>) => processMediaWorker(job),
-  {
-    ...defaultWorkerOptions,
-    concurrency: sanitizeQueueNumber(process.env.MEDIA_WORKER_CONCURRENCY, 2, 1, 10),
-    lockDuration: 1000 * 60 * 10
-  }
-);
+const mediaProcessor: Processor<MediaProcessingJobData, any, MediaJobName> = job => processMediaWorker(job);
+const moderationProcessor: Processor<ModerationJobData, any, ModerationJobName> = job => moderationWorker(job);
+const analyticsProcessor: Processor<AnalyticsJobData, any, AnalyticsJobName> = job => analyticsWorker(job);
 
-export const moderationWorkerInstance = new Worker<ModerationJobData, any, ModerationJobName>(
-  "ai_moderation",
-  async (job: Job<ModerationJobData, any, ModerationJobName>) => moderationWorker(job),
-  {
-    ...defaultWorkerOptions,
-    concurrency: sanitizeQueueNumber(process.env.MODERATION_WORKER_CONCURRENCY, 2, 1, 10),
-    lockDuration: 1000 * 60 * 3
-  }
-);
-
-export const analyticsWorkerInstance = new Worker<AnalyticsJobData, any, AnalyticsJobName>(
-  "analytics_tracking",
-  async (job: Job<AnalyticsJobData, any, AnalyticsJobName>) => analyticsWorker(job),
-  {
-    ...defaultWorkerOptions,
-    concurrency: sanitizeQueueNumber(process.env.ANALYTICS_WORKER_CONCURRENCY, 10, 1, 50),
-    lockDuration: 1000 * 60
-  }
-);
+export const mediaWorker = new Worker<MediaProcessingJobData, any, MediaJobName>("media_processing", mediaProcessor, { ...defaultWorkerOptions, concurrency: sanitizeQueueNumber(process.env.MEDIA_WORKER_CONCURRENCY, 2, 1, 10), lockDuration: 1000 * 60 * 10 });
+export const moderationWorkerInstance = new Worker<ModerationJobData, any, ModerationJobName>("ai_moderation", moderationProcessor, { ...defaultWorkerOptions, concurrency: sanitizeQueueNumber(process.env.MODERATION_WORKER_CONCURRENCY, 2, 1, 10), lockDuration: 1000 * 60 * 3 });
+export const analyticsWorkerInstance = new Worker<AnalyticsJobData, any, AnalyticsJobName>("analytics_tracking", analyticsProcessor, { ...defaultWorkerOptions, concurrency: sanitizeQueueNumber(process.env.ANALYTICS_WORKER_CONCURRENCY, 10, 1, 50), lockDuration: 1000 * 60 });
 
 const bundles: Record<QueueName, QueueBundle> = {
-  media_processing: {
-    queue: mediaQueue,
-    events: mediaQueueEvents,
-    worker: mediaWorker
-  },
-  ai_moderation: {
-    queue: moderationQueue,
-    events: moderationQueueEvents,
-    worker: moderationWorkerInstance
-  },
-  analytics_tracking: {
-    queue: analyticsQueue,
-    events: analyticsQueueEvents,
-    worker: analyticsWorkerInstance
-  }
+  media_processing: { queue: mediaQueue, events: mediaQueueEvents, worker: mediaWorker },
+  ai_moderation: { queue: moderationQueue, events: moderationQueueEvents, worker: moderationWorkerInstance },
+  analytics_tracking: { queue: analyticsQueue, events: analyticsQueueEvents, worker: analyticsWorkerInstance }
 };
 
 export function enqueueMediaProcessing(jobData: MediaProcessingJobData, options: JobsOptions = {}) {
   ensureMediaJob(jobData, "Media");
-  return mediaQueue.add(
-    "process",
-    jobData,
-    mergeJobOptions(
-      {
-        jobId: options.jobId || createJobId("media", jobData),
-        priority: 5,
-        attempts: 4,
-        backoff: {
-          type: "exponential",
-          delay: 3000
-        },
-        removeOnComplete: {
-          age: 60 * 60 * 24,
-          count: 300
-        },
-        removeOnFail: {
-          age: 60 * 60 * 24 * 7,
-          count: 1000
-        }
-      },
-      options
-    )
-  );
+  return mediaQueue.add("process", jobData, mergeJobOptions({ jobId: options.jobId || createJobId("media", jobData), priority: 5, attempts: 4, backoff: { type: "exponential", delay: 3000 }, removeOnComplete: { age: 60 * 60 * 24, count: 300 }, removeOnFail: { age: 60 * 60 * 24 * 7, count: 1000 } }, options));
 }
 
 export function enqueueThumbnailProcessing(jobData: MediaProcessingJobData, options: JobsOptions = {}) {
   ensureMediaJob(jobData, "Thumbnail");
-  return mediaQueue.add(
-    "thumbnail",
-    jobData,
-    mergeJobOptions(
-      {
-        jobId: options.jobId || createJobId("thumbnail", jobData),
-        priority: 3,
-        attempts: 3,
-        backoff: {
-          type: "exponential",
-          delay: 1500
-        },
-        removeOnComplete: {
-          age: 60 * 60 * 24,
-          count: 300
-        },
-        removeOnFail: {
-          age: 60 * 60 * 24 * 7,
-          count: 1000
-        }
-      },
-      options
-    )
-  );
+  return mediaQueue.add("thumbnail", jobData, mergeJobOptions({ jobId: options.jobId || createJobId("thumbnail", jobData), priority: 3, attempts: 3, backoff: { type: "exponential", delay: 1500 }, removeOnComplete: { age: 60 * 60 * 24, count: 300 }, removeOnFail: { age: 60 * 60 * 24 * 7, count: 1000 } }, options));
 }
 
 export function enqueueTranscodeProcessing(jobData: MediaProcessingJobData, options: JobsOptions = {}) {
   ensureMediaJob(jobData, "Transcode");
-  return mediaQueue.add(
-    "transcode",
-    jobData,
-    mergeJobOptions(
-      {
-        jobId: options.jobId || createJobId("transcode", jobData),
-        priority: 2,
-        attempts: 4,
-        backoff: {
-          type: "exponential",
-          delay: 3000
-        },
-        removeOnComplete: {
-          age: 60 * 60 * 24,
-          count: 300
-        },
-        removeOnFail: {
-          age: 60 * 60 * 24 * 7,
-          count: 1000
-        }
-      },
-      options
-    )
-  );
+  return mediaQueue.add("transcode", jobData, mergeJobOptions({ jobId: options.jobId || createJobId("transcode", jobData), priority: 2, attempts: 4, backoff: { type: "exponential", delay: 3000 }, removeOnComplete: { age: 60 * 60 * 24, count: 300 }, removeOnFail: { age: 60 * 60 * 24 * 7, count: 1000 } }, options));
 }
 
 export function enqueueMediaCleanup(jobData: MediaProcessingJobData, options: JobsOptions = {}) {
   ensureMediaJob(jobData, "Cleanup", false);
-  return mediaQueue.add(
-    "cleanup",
-    jobData,
-    mergeJobOptions(
-      {
-        jobId: options.jobId || createJobId("cleanup", jobData),
-        priority: 10,
-        attempts: 2,
-        delay: 1000 * 60 * 10,
-        removeOnComplete: {
-          age: 60 * 60 * 12,
-          count: 500
-        },
-        removeOnFail: {
-          age: 60 * 60 * 24 * 3,
-          count: 500
-        }
-      },
-      options
-    )
-  );
+  return mediaQueue.add("cleanup", jobData, mergeJobOptions({ jobId: options.jobId || createJobId("cleanup", jobData), priority: 10, attempts: 2, delay: 1000 * 60 * 10, removeOnComplete: { age: 60 * 60 * 12, count: 500 }, removeOnFail: { age: 60 * 60 * 24 * 3, count: 500 } }, options));
 }
 
 export function enqueueModeration(jobData: ModerationJobData, options: JobsOptions = {}) {
   ensureModerationJob(jobData, "Moderation");
-  return moderationQueue.add(
-    "scan",
-    jobData,
-    mergeJobOptions(
-      {
-        jobId: options.jobId || createJobId("moderation", jobData),
-        priority: 2,
-        attempts: 3,
-        backoff: {
-          type: "exponential",
-          delay: 2000
-        },
-        removeOnComplete: {
-          age: 60 * 60 * 24,
-          count: 300
-        },
-        removeOnFail: {
-          age: 60 * 60 * 24 * 7,
-          count: 1000
-        }
-      },
-      options
-    )
-  );
+  return moderationQueue.add("scan", jobData, mergeJobOptions({ jobId: options.jobId || createJobId("moderation", jobData), priority: 2, attempts: 3, backoff: { type: "exponential", delay: 2000 }, removeOnComplete: { age: 60 * 60 * 24, count: 300 }, removeOnFail: { age: 60 * 60 * 24 * 7, count: 1000 } }, options));
 }
 
 export function enqueueModerationRescan(jobData: ModerationJobData, options: JobsOptions = {}) {
   ensureModerationJob(jobData, "Moderation rescan");
-  return moderationQueue.add(
-    "rescan",
-    jobData,
-    mergeJobOptions(
-      {
-        jobId: options.jobId || createJobId("moderation-rescan", jobData, true),
-        priority: 1,
-        attempts: 2,
-        backoff: {
-          type: "exponential",
-          delay: 1500
-        },
-        removeOnComplete: {
-          age: 60 * 60 * 24,
-          count: 300
-        },
-        removeOnFail: {
-          age: 60 * 60 * 24 * 7,
-          count: 1000
-        }
-      },
-      options
-    )
-  );
+  return moderationQueue.add("rescan", jobData, mergeJobOptions({ jobId: options.jobId || createJobId("moderation-rescan", jobData, true), priority: 1, attempts: 2, backoff: { type: "exponential", delay: 1500 }, removeOnComplete: { age: 60 * 60 * 24, count: 300 }, removeOnFail: { age: 60 * 60 * 24 * 7, count: 1000 } }, options));
 }
 
 export function enqueueModerationResolve(jobData: ModerationJobData, options: JobsOptions = {}) {
   ensureModerationJob(jobData, "Moderation resolve");
-  return moderationQueue.add(
-    "resolve",
-    jobData,
-    mergeJobOptions(
-      {
-        jobId: options.jobId || createJobId("moderation-resolve", jobData, true),
-        priority: 1,
-        attempts: 2,
-        removeOnComplete: {
-          age: 60 * 60 * 24,
-          count: 300
-        },
-        removeOnFail: {
-          age: 60 * 60 * 24 * 7,
-          count: 1000
-        }
-      },
-      options
-    )
-  );
+  return moderationQueue.add("resolve", jobData, mergeJobOptions({ jobId: options.jobId || createJobId("moderation-resolve", jobData, true), priority: 1, attempts: 2, removeOnComplete: { age: 60 * 60 * 24, count: 300 }, removeOnFail: { age: 60 * 60 * 24 * 7, count: 1000 } }, options));
 }
 
 export function enqueueAnalytics(jobData: AnalyticsJobData, options: JobsOptions = {}) {
   ensureAnalyticsJob(jobData, "Analytics");
-  const payload: AnalyticsJobData = {
-    ...jobData,
-    timestamp: jobData.timestamp || new Date()
-  };
-  return analyticsQueue.add(
-    "track",
-    payload,
-    mergeJobOptions(
-      {
-        jobId: options.jobId,
-        priority: 8,
-        attempts: 5,
-        backoff: {
-          type: "exponential",
-          delay: 1000
-        },
-        removeOnComplete: {
-          age: 60 * 60 * 12,
-          count: 2000
-        },
-        removeOnFail: {
-          age: 60 * 60 * 24 * 3,
-          count: 2000
-        }
-      },
-      options
-    )
-  );
+  const payload: AnalyticsJobData = { ...jobData, timestamp: jobData.timestamp || new Date() };
+  return analyticsQueue.add("track", payload, mergeJobOptions({ jobId: options.jobId, priority: 8, attempts: 5, backoff: { type: "exponential", delay: 1000 }, removeOnComplete: { age: 60 * 60 * 12, count: 2000 }, removeOnFail: { age: 60 * 60 * 24 * 3, count: 2000 } }, options));
 }
 
 export function enqueueAnalyticsAggregate(jobData: AnalyticsJobData, options: JobsOptions = {}) {
   ensureAnalyticsJob(jobData, "Analytics aggregate");
-  return analyticsQueue.add(
-    "aggregate",
-    jobData,
-    mergeJobOptions(
-      {
-        jobId: options.jobId || createJobId("analytics-aggregate", jobData),
-        priority: 6,
-        attempts: 4,
-        backoff: {
-          type: "exponential",
-          delay: 1500
-        },
-        removeOnComplete: {
-          age: 60 * 60 * 12,
-          count: 1000
-        },
-        removeOnFail: {
-          age: 60 * 60 * 24 * 3,
-          count: 1000
-        }
-      },
-      options
-    )
-  );
+  return analyticsQueue.add("aggregate", jobData, mergeJobOptions({ jobId: options.jobId || createJobId("analytics-aggregate", jobData), priority: 6, attempts: 4, backoff: { type: "exponential", delay: 1500 }, removeOnComplete: { age: 60 * 60 * 12, count: 1000 }, removeOnFail: { age: 60 * 60 * 24 * 3, count: 1000 } }, options));
 }
 
 export function enqueueAnalyticsFlush(jobData: AnalyticsJobData, options: JobsOptions = {}) {
   ensureAnalyticsJob(jobData, "Analytics flush");
-  return analyticsQueue.add(
-    "flush",
-    {
-      ...jobData,
-      timestamp: jobData.timestamp || new Date()
-    },
-    mergeJobOptions(
-      {
-        jobId: options.jobId || createJobId("analytics-flush", jobData, true),
-        priority: 4,
-        attempts: 3,
-        backoff: {
-          type: "exponential",
-          delay: 1000
-        },
-        removeOnComplete: {
-          age: 60 * 60 * 12,
-          count: 1000
-        },
-        removeOnFail: {
-          age: 60 * 60 * 24 * 3,
-          count: 1000
-        }
-      },
-      options
-    )
-  );
+  return analyticsQueue.add("flush", { ...jobData, timestamp: jobData.timestamp || new Date() }, mergeJobOptions({ jobId: options.jobId || createJobId("analytics-flush", jobData, true), priority: 4, attempts: 3, backoff: { type: "exponential", delay: 1000 }, removeOnComplete: { age: 60 * 60 * 12, count: 1000 }, removeOnFail: { age: 60 * 60 * 24 * 3, count: 1000 } }, options));
 }
 
 export async function getQueueHealth() {
-  const entries = await Promise.all(
-    QUEUE_NAMES.map(async name => {
-      const bundle = bundles[name];
-      const [counts, paused, waiting, active, delayed, failed, completed] = await Promise.all([
-        bundle.queue.getJobCounts("waiting", "active", "completed", "failed", "delayed", "paused", "prioritized", "waiting-children"),
-        bundle.queue.isPaused(),
-        bundle.queue.getWaitingCount(),
-        bundle.queue.getActiveCount(),
-        bundle.queue.getDelayedCount(),
-        bundle.queue.getFailedCount(),
-        bundle.queue.getCompletedCount()
-      ]);
-      return [
-        name,
-        {
-          paused,
-          counts,
-          waiting,
-          active,
-          delayed,
-          failed,
-          completed
-        }
-      ] as const;
-    })
-  );
-
+  const entries = await Promise.all(QUEUE_NAMES.map(async name => {
+    const bundle = bundles[name];
+    const [counts, paused, waiting, active, delayed, failed, completed] = await Promise.all([
+      bundle.queue.getJobCounts("waiting", "active", "completed", "failed", "delayed", "paused", "prioritized", "waiting-children"),
+      bundle.queue.isPaused(),
+      bundle.queue.getWaitingCount(),
+      bundle.queue.getActiveCount(),
+      bundle.queue.getDelayedCount(),
+      bundle.queue.getFailedCount(),
+      bundle.queue.getCompletedCount()
+    ]);
+    return [name, { paused, counts, waiting, active, delayed, failed, completed }] as const;
+  }));
   return Object.fromEntries(entries) as Record<QueueName, any>;
 }
 
@@ -594,7 +229,6 @@ export async function cleanQueues(graceMs = 1000 * 60 * 60 * 24) {
     analyticsQueue.clean(graceMs / 2, 1000, "completed"),
     analyticsQueue.clean(graceMs * 3, 1000, "failed")
   ]);
-
   return getQueueHealth();
 }
 
@@ -611,37 +245,19 @@ export async function obliterateQueues(names?: QueueName[]) {
   return getQueueHealth();
 }
 
-function bindWorkerLogs(worker: Worker, name: QueueName) {
+function bindWorkerLogs(worker: Worker<any, any, string>, name: QueueName) {
   worker.on("completed", job => {
-    console.log(`[Queue:${name}] completed`, {
-      id: job.id,
-      name: job.name,
-      attemptsMade: job.attemptsMade,
-      finishedOn: job.finishedOn
-    });
+    console.log(`[Queue:${name}] completed`, { id: job.id, name: job.name, attemptsMade: job.attemptsMade, finishedOn: job.finishedOn });
   });
-
   worker.on("failed", (job, error) => {
-    console.error(`[Queue:${name}] failed`, {
-      id: job?.id,
-      name: job?.name,
-      attemptsMade: job?.attemptsMade,
-      failedReason: job?.failedReason,
-      error: error.message
-    });
+    console.error(`[Queue:${name}] failed`, { id: job?.id, name: job?.name, attemptsMade: job?.attemptsMade, failedReason: job?.failedReason, error: error.message });
   });
-
   worker.on("stalled", jobId => {
     console.warn(`[Queue:${name}] stalled`, { jobId });
   });
-
   worker.on("error", error => {
-    console.error(`[Queue:${name}] worker error`, {
-      message: error.message,
-      stack: error.stack
-    });
+    console.error(`[Queue:${name}] worker error`, { message: error.message, stack: error.stack });
   });
-
   worker.on("closed", () => {
     console.log(`[Queue:${name}] worker closed`);
   });
@@ -651,31 +267,23 @@ function bindQueueEvents(events: QueueEvents, name: QueueName) {
   events.on("completed", ({ jobId, returnvalue }) => {
     console.log(`[QueueEvents:${name}] completed`, { jobId, returnvalue });
   });
-
   events.on("failed", ({ jobId, failedReason }) => {
     console.error(`[QueueEvents:${name}] failed`, { jobId, failedReason });
   });
-
   events.on("progress", ({ jobId, data }) => {
     console.log(`[QueueEvents:${name}] progress`, { jobId, data });
   });
-
   events.on("stalled", ({ jobId }) => {
     console.warn(`[QueueEvents:${name}] stalled`, { jobId });
   });
-
   events.on("error", error => {
-    console.error(`[QueueEvents:${name}] error`, {
-      message: error.message,
-      stack: error.stack
-    });
+    console.error(`[QueueEvents:${name}] error`, { message: error.message, stack: error.stack });
   });
 }
 
 bindWorkerLogs(mediaWorker, "media_processing");
 bindWorkerLogs(moderationWorkerInstance, "ai_moderation");
 bindWorkerLogs(analyticsWorkerInstance, "analytics_tracking");
-
 bindQueueEvents(mediaQueueEvents, "media_processing");
 bindQueueEvents(moderationQueueEvents, "ai_moderation");
 bindQueueEvents(analyticsQueueEvents, "analytics_tracking");
@@ -684,7 +292,6 @@ let closingPromise: Promise<void> | null = null;
 
 export async function closeQueues() {
   if (closingPromise) return closingPromise;
-
   closingPromise = Promise.allSettled([
     mediaWorker.close(),
     moderationWorkerInstance.close(),
@@ -699,7 +306,6 @@ export async function closeQueues() {
     connection.quit(),
     queueConnection.quit()
   ]).then(() => undefined);
-
   return closingPromise;
 }
 
