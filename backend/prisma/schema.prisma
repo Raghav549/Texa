@@ -973,7 +973,7 @@ model RoomAnalytics {
   @@index([event, createdAt])
 }
 
-model TradeDay {
+model TradingDay {
   id           String            @id @default(cuid())
   date         DateTime          @unique
   title        String
@@ -989,20 +989,21 @@ model TradeDay {
 
   @@index([date])
   @@index([isActive])
+  @@map("TradeDay")
 }
 
 model TradeInvestment {
-  id        String   @id @default(cuid())
+  id        String     @id @default(cuid())
   dayId     String
-  day       TradeDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  day       TradingDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   choiceId  String
   amount    Int
-  status    String   @default("pending")
-  payout    Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  status    String     @default("pending")
+  payout    Int        @default(0)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
   @@index([dayId, userId])
   @@index([userId, createdAt])
