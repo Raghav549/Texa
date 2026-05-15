@@ -5,7 +5,8 @@ import os from "os";
 import crypto from "crypto";
 import axios from "axios";
 import { processVideo, optimizeImage, generateImageVariants, getMediaMetadata } from "../services/media/processor";
-import { uploadToS3, deleteLocalFiles } from "../services/storage/s3";
+import { uploadToS3 } from "../services/storage/s3";
+import { deleteLocalFiles } from "../utils/media";
 import { prisma } from "../config/db";
 
 type MediaEntityType = "reel" | "story" | "product" | "avatar" | "banner" | "message" | "store" | "other";
