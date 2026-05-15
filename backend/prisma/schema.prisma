@@ -1376,3 +1376,51 @@ model SearchLog {
   @@index([query])
   @@index([type])
 }
+
+model TradeDay {
+  id              String      @id @default(cuid())
+  title           String
+  description     String?
+  symbol          String?
+  category        String?
+  status          String      @default("active")
+  startsAt        DateTime    @default(now())
+  endsAt          DateTime?
+  lockedAt        DateTime?
+  settledAt       DateTime?
+  winningOption   String?
+  totalVotes      Int         @default(0)
+  totalBullVotes  Int         @default(0)
+  totalBearVotes  Int         @default(0)
+  metadata        Json?
+  createdById     String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  votes           TradeVote[]
+
+  @@index([status])
+  @@index([startsAt])
+  @@index([endsAt])
+  @@index([createdById])
+}
+
+model TradeVote {
+  id          String   @id @default(cuid())
+  tradeDayId  String
+  userId      String
+  option      String
+  amount      Int      @default(0)
+  isWinner    Boolean  @default(false)
+  reward      Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tradeDay    TradeDay @relation(fields: [tradeDayId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tradeDayId, userId])
+  @@index([tradeDayId])
+  @@index([userId])
+  @@index([option])
+  @@index([isWinner])
+}
