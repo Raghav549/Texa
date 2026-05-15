@@ -977,3 +977,12 @@ export const writeUploadToTempFile = writeTempFile;
 export const removeUploadTempFile = removeTempFile;
 
 export const cloudinaryClient = cloudinary;
+
+export async function deleteLocalFiles(paths: Array<string | undefined | null>) {
+  const fs = await import("fs/promises");
+  await Promise.all(
+    paths
+      .filter((path): path is string => typeof path === "string" && path.length > 0)
+      .map(path => fs.unlink(path).catch(() => undefined))
+  );
+}
