@@ -8,17 +8,26 @@ const hexColorRegex = /^#(?:[0-9a-fA-F]{3}){1,2}$/;
 const urlSchema = z.string().trim().url().max(2048);
 const nullableUrlSchema = z.union([urlSchema, z.literal(""), z.null()]).transform(value => (value ? value : null));
 const safeText = (min = 1, max = 5000) => z.string().trim().min(min).max(max);
-const optionalSafeText = (max = 5000) => z.string().trim().max(max).optional();
 const boolish = z.union([
   z.boolean(),
   z.string().trim().transform(value => ["true", "1", "yes", "on"].includes(value.toLowerCase()))
 ]);
-const numberish = () =>
-  z.union([
-    z.number(),
-    z.string().trim().transform(value => Number(value))
-  ]).pipe(z.number().finite());
-const intish = () => numberish().transform(value => Math.floor(value)).pipe(z.number().int());
+const numberish = () => z.preprocess(value => {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length ? Number(trimmed) : Number.NaN;
+  }
+  return value;
+}, z.number().finite());
+const intish = () => z.preprocess(value => {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    const parsed = trimmed.length ? Number(trimmed) : Number.NaN;
+    return Number.isFinite(parsed) ? Math.floor(parsed) : parsed;
+  }
+  if (typeof value === "number") return Number.isFinite(value) ? Math.floor(value) : value;
+  return value;
+}, z.number().int());
 const jsonRecord = z.record(z.string(), z.any());
 
 export const idSchema = objectIdLike;
@@ -115,14 +124,8 @@ export const updateProfileSchema = z.object({
   accentColor: z.string().trim().regex(hexColorRegex).optional()
 });
 
-export const followSchema = z.object({
-  userId: objectIdLike
-});
-
-export const blockUserSchema = z.object({
-  userId: objectIdLike,
-  reason: z.string().trim().max(300).optional()
-});
+export const followSchema = z.object({ userId: objectIdLike });
+export const blockUserSchema = z.object({ userId: objectIdLike, reason: z.string().trim().max(300).optional() });
 
 export const conversationCreateSchema = z.object({
   type: z.enum(["DIRECT", "GROUP", "SUPPORT", "ROOM"]).optional().default("DIRECT"),
@@ -132,10 +135,7 @@ export const conversationCreateSchema = z.object({
   avatarUrl: nullableUrlSchema.optional(),
   settings: jsonRecord.optional(),
   metadata: jsonRecord.optional()
-}).transform(value => ({
-  ...value,
-  name: value.name || value.title
-}));
+}).transform(value => ({ ...value, name: value.name || value.title }));
 
 export const messageSchema = z.object({
   receiverId: objectIdLike.optional(),
@@ -153,25 +153,10 @@ export const messageSchema = z.object({
   metadata: jsonRecord.optional()
 }).refine(value => value.receiverId || value.conversationId, "Receiver or conversation required").refine(value => Boolean(value.content || value.mediaUrl || value.poll || value.payment), "Message content or media required");
 
-export const messageEditSchema = z.object({
-  messageId: objectIdLike,
-  content: safeText(1, 5000)
-});
-
-export const messageDeleteSchema = z.object({
-  messageId: objectIdLike,
-  forEveryone: z.boolean().optional().default(false)
-});
-
-export const messageReactionSchema = z.object({
-  messageId: objectIdLike,
-  emoji: z.string().trim().min(1).max(32),
-  remove: z.boolean().optional().default(false)
-});
-
-export const roomSchema = z.object({
-  roomId: objectIdLike
-});
+export const messageEditSchema = z.object({ messageId: objectIdLike, content: safeText(1, 5000) });
+export const messageDeleteSchema = z.object({ messageId: objectIdLike, forEveryone: z.boolean().optional().default(false) });
+export const messageReactionSchema = z.object({ messageId: objectIdLike, emoji: z.string().trim().min(1).max(32), remove: z.boolean().optional().default(false) });
+export const roomSchema = z.object({ roomId: objectIdLike });
 
 export const createRoomSchema = z.object({
   title: safeText(2, 80),
@@ -189,26 +174,8 @@ export const createRoomSchema = z.object({
   settings: jsonRecord.optional()
 });
 
-export const updateRoomSchema = z.object({
-  roomId: objectIdLike,
-  title: z.string().trim().min(2).max(80).optional(),
-  description: z.string().trim().max(500).optional(),
-  topic: z.string().trim().max(80).optional(),
-  coverUrl: nullableUrlSchema.optional(),
-  visibility: z.enum(["PUBLIC", "FOLLOWERS", "PRIVATE"]).optional(),
-  maxSeats: intish().min(1).max(10).optional(),
-  tags: z.array(z.string().trim().min(1).max(30)).max(10).optional(),
-  language: z.string().trim().min(2).max(20).optional(),
-  category: z.string().trim().max(80).optional(),
-  allowGifts: z.boolean().optional(),
-  allowChat: z.boolean().optional(),
-  settings: jsonRecord.optional()
-});
-
-export const seatSchema = z.object({
-  roomId: objectIdLike.optional(),
-  seatIndex: intish().min(0).max(9).optional()
-});
+export const updateRoomSchema = createRoomSchema.partial().extend({ roomId: objectIdLike });
+export const seatSchema = z.object({ roomId: objectIdLike.optional(), seatIndex: intish().min(0).max(9).optional() });
 
 export const chatSchema = z.object({
   content: z.string().trim().max(500).optional(),
@@ -218,30 +185,10 @@ export const chatSchema = z.object({
   clientId: z.string().trim().max(128).optional()
 }).refine(value => Boolean(value.content || value.mediaUrl), "Message required");
 
-export const giftSchema = z.object({
-  toId: objectIdLike,
-  giftId: z.string().trim().min(1).max(80),
-  amount: numberish().min(1).max(100000)
-});
+export const giftSchema = z.object({ toId: objectIdLike, giftId: z.string().trim().min(1).max(80), amount: numberish().min(1).max(100000) });
 
 export const hostActionSchema = z.object({
-  action: z.enum([
-    "mute",
-    "unmute",
-    "kick",
-    "promote_mod",
-    "remove_mod",
-    "lock_room",
-    "unlock_room",
-    "close_room",
-    "transfer_host",
-    "raise_hand",
-    "lower_hand",
-    "launch_poll",
-    "pause_music",
-    "resume_music",
-    "next_music"
-  ]),
+  action: z.enum(["mute", "unmute", "kick", "promote_mod", "remove_mod", "lock_room", "unlock_room", "close_room", "transfer_host", "raise_hand", "lower_hand", "launch_poll", "pause_music", "resume_music", "next_music"]),
   targetId: objectIdLike.optional(),
   question: z.string().trim().max(160).optional(),
   options: z.array(z.string().trim().min(1).max(80)).min(2).max(6).optional()
@@ -249,35 +196,12 @@ export const hostActionSchema = z.object({
 
 export const roomActionSchema = z.object({
   roomId: objectIdLike,
-  action: z.enum([
-    "mute",
-    "unmute",
-    "kick",
-    "promote",
-    "promote_mod",
-    "remove_mod",
-    "close",
-    "close_room",
-    "lock_room",
-    "unlock_room",
-    "pause_music",
-    "resume_music",
-    "next_music",
-    "transfer_host",
-    "lower_hand"
-  ]),
+  action: z.enum(["mute", "unmute", "kick", "promote", "promote_mod", "remove_mod", "close", "close_room", "lock_room", "unlock_room", "pause_music", "resume_music", "next_music", "transfer_host", "lower_hand"]),
   targetId: objectIdLike.optional()
 });
 
-export const pollVoteSchema = z.object({
-  pollId: z.string().trim().min(1).max(120),
-  optionIndex: intish().min(0).max(20)
-});
-
-export const tradeActionSchema = z.object({
-  choiceId: z.string().trim().min(1).max(120),
-  amount: numberish().min(10).max(5000).optional()
-});
+export const pollVoteSchema = z.object({ pollId: z.string().trim().min(1).max(120), optionIndex: intish().min(0).max(20) });
+export const tradeActionSchema = z.object({ choiceId: z.string().trim().min(1).max(120), amount: numberish().min(10).max(5000).optional() });
 
 export const createTradingDaySchema = z.object({
   date: z.string().trim().min(4).max(40),
@@ -294,10 +218,7 @@ export const createTradingDaySchema = z.object({
   lockedAt: z.string().datetime().optional()
 });
 
-export const resolveTradingDaySchema = z.object({
-  dayId: objectIdLike,
-  winnerChoice: z.string().trim().min(1).max(120)
-});
+export const resolveTradingDaySchema = z.object({ dayId: objectIdLike, winnerChoice: z.string().trim().min(1).max(120) });
 
 export const postCreateSchema = z.object({
   content: z.string().trim().max(5000).optional(),
@@ -317,12 +238,7 @@ export const postUpdateSchema = z.object({
   metadata: jsonRecord.optional()
 });
 
-export const commentCreateSchema = z.object({
-  targetId: objectIdLike,
-  targetType: z.enum(["POST", "REEL", "STORY", "PRODUCT"]),
-  content: safeText(1, 1000),
-  parentId: optionalObjectIdLike
-});
+export const commentCreateSchema = z.object({ targetId: objectIdLike, targetType: z.enum(["POST", "REEL", "STORY", "PRODUCT"]), content: safeText(1, 1000), parentId: optionalObjectIdLike });
 
 export const reelCreateSchema = z.object({
   caption: z.string().trim().max(2200).optional(),
@@ -349,7 +265,7 @@ export const storyCreateSchema = z.object({
   metadata: jsonRecord.optional()
 });
 
-export const productCreateSchema = z.object({
+const productBaseSchema = z.object({
   storeId: objectIdLike.optional(),
   name: safeText(2, 160).optional(),
   title: safeText(2, 160).optional(),
@@ -376,7 +292,9 @@ export const productCreateSchema = z.object({
   shippingWeight: numberish().min(0).max(1000000).optional(),
   status: z.enum(["DRAFT", "ACTIVE", "ARCHIVED", "OUT_OF_STOCK"]).optional().default("DRAFT"),
   metadata: jsonRecord.optional()
-}).transform(value => {
+});
+
+const normalizeProduct = <T extends z.infer<typeof productBaseSchema>>(value: T) => {
   const mediaUrls = value.mediaUrls || value.images || [];
   return {
     ...value,
@@ -386,19 +304,14 @@ export const productCreateSchema = z.object({
     inventory: value.inventory ?? value.stock ?? 0,
     categoryIds: value.categoryIds || []
   };
-}).refine(value => value.name.length >= 2, "Product name is required");
+};
 
-export const productUpdateSchema = productCreateSchema.partial().extend({
-  productId: objectIdLike
-});
+export const productCreateSchema = productBaseSchema.transform(normalizeProduct).refine(value => value.name.length >= 2, "Product name is required");
+export const productUpdateSchema = productBaseSchema.partial().extend({ productId: objectIdLike }).transform(normalizeProduct);
 
 export const orderCreateSchema = z.object({
   storeId: objectIdLike.optional(),
-  items: z.array(z.object({
-    productId: objectIdLike,
-    quantity: intish().min(1).max(100),
-    attributes: jsonRecord.optional()
-  })).min(1).max(50),
+  items: z.array(z.object({ productId: objectIdLike, quantity: intish().min(1).max(100), attributes: jsonRecord.optional() })).min(1).max(50),
   addressId: objectIdLike.optional(),
   shippingAddress: jsonRecord.optional(),
   billingAddress: jsonRecord.optional(),
@@ -413,10 +326,7 @@ export const reportSchema = z.object({
   details: z.string().trim().max(1000).optional(),
   description: z.string().trim().max(1000).optional(),
   evidenceUrls: z.array(urlSchema).max(10).optional().default([])
-}).transform(value => ({
-  ...value,
-  details: value.details || value.description
-}));
+}).transform(value => ({ ...value, details: value.details || value.description }));
 
 export const moderationActionSchema = z.object({
   targetId: objectIdLike,
@@ -435,22 +345,10 @@ export const notificationCreateSchema = z.object({
   actionUrl: z.string().trim().max(2048).optional(),
   data: jsonRecord.optional(),
   metadata: jsonRecord.optional()
-}).transform(value => ({
-  ...value,
-  data: value.data || value.metadata || {}
-}));
+}).transform(value => ({ ...value, data: value.data || value.metadata || {} }));
 
-export const uploadSchema = z.object({
-  folder: z.string().trim().min(1).max(120).optional(),
-  type: z.enum(["image", "video", "audio", "file", "auto"]).optional().default("auto")
-});
-
-export const signedUploadSchema = z.object({
-  folder: z.string().trim().min(1).max(120).optional(),
-  contentType: z.string().trim().min(3).max(120),
-  fileName: z.string().trim().min(1).max(255).optional(),
-  maxSizeBytes: intish().min(1).max(1024 * 1024 * 1024).optional()
-});
+export const uploadSchema = z.object({ folder: z.string().trim().min(1).max(120).optional(), type: z.enum(["image", "video", "audio", "file", "auto"]).optional().default("auto") });
+export const signedUploadSchema = z.object({ folder: z.string().trim().min(1).max(120).optional(), contentType: z.string().trim().min(3).max(120), fileName: z.string().trim().min(1).max(255).optional(), maxSizeBytes: intish().min(1).max(1024 * 1024 * 1024).optional() });
 
 export const walletTransactionSchema = z.object({
   userId: objectIdLike.optional(),
@@ -493,9 +391,7 @@ export const storeCreateSchema = z.object({
   metadata: jsonRecord.optional()
 });
 
-export const storeUpdateSchema = storeCreateSchema.partial().extend({
-  storeId: objectIdLike
-});
+export const storeUpdateSchema = storeCreateSchema.partial().extend({ storeId: objectIdLike });
 
 export const adCreateSchema = z.object({
   storeId: objectIdLike.optional(),
