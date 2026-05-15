@@ -15,6 +15,16 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 import mime from 'mime-types';
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  DeleteObjectsCommand,
+  CopyObjectCommand,
+  HeadObjectCommand,
+  GetObjectCommand,
+  ServerSideEncryption
+} from '@aws-sdk/client-s3';
 
 export type UploadInputValue =
   | string
