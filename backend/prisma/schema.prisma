@@ -212,6 +212,7 @@ model User {
   commerceEvents       CommerceEvent[]
   tradeLeaderboard     TradeLeaderboard?
   tradeInvestments     TradeInvestment[]
+  tradeVotes           TradeVote[]
   stores               Store[]
   cart                 Cart?
   orders               Order[]
