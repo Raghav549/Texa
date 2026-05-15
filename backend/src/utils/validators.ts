@@ -12,22 +12,8 @@ const boolish = z.union([
   z.boolean(),
   z.string().trim().transform(value => ["true", "1", "yes", "on"].includes(value.toLowerCase()))
 ]);
-const numberish = () => z.preprocess(value => {
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    return trimmed.length ? Number(trimmed) : Number.NaN;
-  }
-  return value;
-}, z.number().finite());
-const intish = () => z.preprocess(value => {
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    const parsed = trimmed.length ? Number(trimmed) : Number.NaN;
-    return Number.isFinite(parsed) ? Math.floor(parsed) : parsed;
-  }
-  if (typeof value === "number") return Number.isFinite(value) ? Math.floor(value) : value;
-  return value;
-}, z.number().int());
+const numberish = () => z.coerce.number().finite();
+const intish = () => z.coerce.number().int();
 const jsonRecord = z.record(z.string(), z.any());
 
 export const idSchema = objectIdLike;
@@ -78,35 +64,13 @@ export const loginSchema = z.object({
   fcmToken: z.string().trim().max(512).optional()
 });
 
-export const usernameSchema = z.object({
-  username: z.string().trim().toLowerCase().regex(usernameRegex)
-});
-
-export const emailSchema = z.object({
-  email: z.string().trim().toLowerCase().email().max(254)
-});
-
-export const phoneSchema = z.object({
-  phone: z.string().trim().regex(phoneRegex)
-});
-
-export const passwordResetRequestSchema = z.object({
-  email: z.string().trim().toLowerCase().email().max(254)
-});
-
-export const passwordResetSchema = z.object({
-  token: z.string().trim().min(16).max(512),
-  password: z.string().min(8).max(128).regex(/[a-z]/).regex(/[A-Z]/).regex(/[0-9]/)
-});
-
-export const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1).max(128),
-  newPassword: z.string().min(8).max(128).regex(/[a-z]/).regex(/[A-Z]/).regex(/[0-9]/)
-});
-
-export const refreshTokenSchema = z.object({
-  refreshToken: z.string().trim().min(16).max(2048)
-});
+export const usernameSchema = z.object({ username: z.string().trim().toLowerCase().regex(usernameRegex) });
+export const emailSchema = z.object({ email: z.string().trim().toLowerCase().email().max(254) });
+export const phoneSchema = z.object({ phone: z.string().trim().regex(phoneRegex) });
+export const passwordResetRequestSchema = z.object({ email: z.string().trim().toLowerCase().email().max(254) });
+export const passwordResetSchema = z.object({ token: z.string().trim().min(16).max(512), password: z.string().min(8).max(128).regex(/[a-z]/).regex(/[A-Z]/).regex(/[0-9]/) });
+export const changePasswordSchema = z.object({ currentPassword: z.string().min(1).max(128), newPassword: z.string().min(8).max(128).regex(/[a-z]/).regex(/[A-Z]/).regex(/[0-9]/) });
+export const refreshTokenSchema = z.object({ refreshToken: z.string().trim().min(16).max(2048) });
 
 export const updateProfileSchema = z.object({
   fullName: z.string().trim().min(2).max(80).optional(),
@@ -294,7 +258,7 @@ const productBaseSchema = z.object({
   metadata: jsonRecord.optional()
 });
 
-const normalizeProduct = <T extends z.infer<typeof productBaseSchema>>(value: T) => {
+const normalizeProduct = (value: any) => {
   const mediaUrls = value.mediaUrls || value.images || [];
   return {
     ...value,
