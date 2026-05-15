@@ -1,19 +1,27 @@
-import { Worker } from "bullmq";
-import { redis } from "../config/redis";
+import { Job } from "bullmq";
 
-export type ModerationJobName = "moderate_content" | "scan_media" | "review_report" | string;
-export type ModerationJobData = Record<string, any>;
+export type ModerationJobName = "scan" | "rescan" | "resolve";
+export type ModerationJobData = {
+  itemId?: string;
+  userId: string;
+  type: "image" | "video" | "text" | "user" | "store" | "product" | "comment" | "message";
+  content: string;
+  source?: string;
+  metadata?: Record<string, any>;
+};
 
-const connection = redis as any;
-
-export const moderationWorker = new Worker<ModerationJobData, any, ModerationJobName>(
-  "moderation",
-  async job => {
-    return { ok: true, jobId: job.id, name: job.name, processedAt: new Date().toISOString() };
-  },
-  { connection }
-);
-
-moderationWorker.on("failed", (job, error) => {
-  console.error("moderation worker failed", job?.id, error?.message);
-});
+export async function moderationWorker(job: Job<ModerationJobData, any, ModerationJobName>) {
+  const data = job.data;
+  if (!data?.userId) throw new Error("Moderation job requires userId");
+  if (!data?.type) throw new Error("Moderation job requires type");
+  if (!data?.content) throw new Error("Moderation job requires content");
+  return {
+    ok: true,
+    jobId: job.id,
+    name: job.name,
+    itemId: data.itemId || null,
+    userId: data.userId,
+    type: data.type,
+    processedAt: new Date().toISOString()
+  };
+}
