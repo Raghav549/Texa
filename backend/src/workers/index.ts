@@ -1,4 +1,4 @@
-import { Queue, Worker, QueueEvents, JobsOptions, WorkerOptions, QueueOptions, Job, Processor } from "bullmq";
+import { Queue, Worker, QueueEvents, JobsOptions, WorkerOptions, QueueOptions, Job } from "bullmq";
 import crypto from "crypto";
 import { redis } from "../config/redis";
 import { processMediaWorker } from "./media.worker";
@@ -43,9 +43,9 @@ export interface AnalyticsJobData {
 }
 
 type QueueBundle = {
-  queue: Queue<any, any, string>;
+  queue: Queue<any, any, any>;
   events: QueueEvents;
-  worker: Worker<any, any, string>;
+  worker: Worker<any, any, any>;
 };
 
 const QUEUE_NAMES: QueueName[] = ["media_processing", "ai_moderation", "analytics_tracking"];
@@ -120,13 +120,9 @@ export const mediaQueueEvents = new QueueEvents("media_processing", { connection
 export const moderationQueueEvents = new QueueEvents("ai_moderation", { connection: eventConnection.duplicate() });
 export const analyticsQueueEvents = new QueueEvents("analytics_tracking", { connection: eventConnection.duplicate() });
 
-const mediaProcessor: Processor<MediaProcessingJobData, any, MediaJobName> = job => processMediaWorker(job);
-const moderationProcessor: Processor<ModerationJobData, any, ModerationJobName> = job => moderationWorker(job);
-const analyticsProcessor: Processor<AnalyticsJobData, any, AnalyticsJobName> = job => analyticsWorker(job);
-
-export const mediaWorker = new Worker<MediaProcessingJobData, any, MediaJobName>("media_processing", mediaProcessor, { ...defaultWorkerOptions, concurrency: sanitizeQueueNumber(process.env.MEDIA_WORKER_CONCURRENCY, 2, 1, 10), lockDuration: 1000 * 60 * 10 });
-export const moderationWorkerInstance = new Worker<ModerationJobData, any, ModerationJobName>("ai_moderation", moderationProcessor, { ...defaultWorkerOptions, concurrency: sanitizeQueueNumber(process.env.MODERATION_WORKER_CONCURRENCY, 2, 1, 10), lockDuration: 1000 * 60 * 3 });
-export const analyticsWorkerInstance = new Worker<AnalyticsJobData, any, AnalyticsJobName>("analytics_tracking", analyticsProcessor, { ...defaultWorkerOptions, concurrency: sanitizeQueueNumber(process.env.ANALYTICS_WORKER_CONCURRENCY, 10, 1, 50), lockDuration: 1000 * 60 });
+export const mediaWorker = new Worker<MediaProcessingJobData, any, MediaJobName>("media_processing", async (job: Job<MediaProcessingJobData, any, MediaJobName>) => processMediaWorker(job as any), { ...defaultWorkerOptions, concurrency: sanitizeQueueNumber(process.env.MEDIA_WORKER_CONCURRENCY, 2, 1, 10), lockDuration: 1000 * 60 * 10 });
+export const moderationWorkerInstance = new Worker<ModerationJobData, any, ModerationJobName>("ai_moderation", async (job: Job<ModerationJobData, any, ModerationJobName>) => moderationWorker(job as any), { ...defaultWorkerOptions, concurrency: sanitizeQueueNumber(process.env.MODERATION_WORKER_CONCURRENCY, 2, 1, 10), lockDuration: 1000 * 60 * 3 });
+export const analyticsWorkerInstance = new Worker<AnalyticsJobData, any, AnalyticsJobName>("analytics_tracking", async (job: Job<AnalyticsJobData, any, AnalyticsJobName>) => analyticsWorker(job as any), { ...defaultWorkerOptions, concurrency: sanitizeQueueNumber(process.env.ANALYTICS_WORKER_CONCURRENCY, 10, 1, 50), lockDuration: 1000 * 60 });
 
 const bundles: Record<QueueName, QueueBundle> = {
   media_processing: { queue: mediaQueue, events: mediaQueueEvents, worker: mediaWorker },
@@ -245,7 +241,7 @@ export async function obliterateQueues(names?: QueueName[]) {
   return getQueueHealth();
 }
 
-function bindWorkerLogs(worker: Worker<any, any, string>, name: QueueName) {
+function bindWorkerLogs(worker: Worker<any, any, any>, name: QueueName) {
   worker.on("completed", job => {
     console.log(`[Queue:${name}] completed`, { id: job.id, name: job.name, attemptsMade: job.attemptsMade, finishedOn: job.finishedOn });
   });
