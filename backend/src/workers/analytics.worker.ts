@@ -1,19 +1,28 @@
-import { Worker } from "bullmq";
-import { redis } from "../config/redis";
+import { Job } from "bullmq";
 
-export type AnalyticsJobName = "track_event" | "flush_analytics" | "aggregate_metrics" | string;
-export type AnalyticsJobData = Record<string, any>;
+export type AnalyticsJobName = "track" | "aggregate" | "flush";
+export type AnalyticsJobData = {
+  userId?: string;
+  anonymousId?: string;
+  type: string;
+  targetType?: string;
+  targetId?: string;
+  sessionId?: string;
+  metadata?: Record<string, any>;
+  timestamp?: string | Date;
+};
 
-const connection = redis as any;
-
-export const analyticsWorker = new Worker<AnalyticsJobData, any, AnalyticsJobName>(
-  "analytics",
-  async job => {
-    return { ok: true, jobId: job.id, name: job.name, processedAt: new Date().toISOString() };
-  },
-  { connection }
-);
-
-analyticsWorker.on("failed", (job, error) => {
-  console.error("analytics worker failed", job?.id, error?.message);
-});
+export async function analyticsWorker(job: Job<AnalyticsJobData, any, AnalyticsJobName>) {
+  const data = job.data;
+  if (!data?.type) throw new Error("Analytics job requires type");
+  return {
+    ok: true,
+    jobId: job.id,
+    name: job.name,
+    type: data.type,
+    userId: data.userId || null,
+    targetType: data.targetType || null,
+    targetId: data.targetId || null,
+    processedAt: new Date().toISOString()
+  };
+}
