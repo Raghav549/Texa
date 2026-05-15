@@ -60,7 +60,7 @@ function getToken(socket: Socket) {
   return '';
 }
 
-function isValidId(value: any) {
+function isValidId(value: any): value is string {
   return typeof value === 'string' && value.length >= 6 && value.length <= 128 && /^[a-zA-Z0-9_-]+$/.test(value);
 }
 
