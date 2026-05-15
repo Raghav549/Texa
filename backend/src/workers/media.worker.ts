@@ -155,7 +155,7 @@ async function downloadInputFile(data: MediaWorkerJobData, itemId: string, type:
 async function emitToUser(userId: string | undefined, event: string, payload: Record<string, any>) {
   if (!userId) return;
   try {
-    const { io } = await import("../app.ts")
+    const { io } = const { io } = await import("../app")
     io.to(`user:${userId}`).emit(event, payload);
   } catch {}
 }
@@ -163,7 +163,7 @@ async function emitToUser(userId: string | undefined, event: string, payload: Re
 async function emitToStore(storeId: string | undefined, event: string, payload: Record<string, any>) {
   if (!storeId) return;
   try {
-    const { io } = await import("../app.ts")
+    const { io } = const { io } = await import("../app")
     io.to(`store:${storeId}`).emit(event, payload);
   } catch {}
 }
